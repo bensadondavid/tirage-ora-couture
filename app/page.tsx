@@ -15,6 +15,10 @@ type Winner = {
 
 type Phase = "idle" | "spinning" | "done";
 
+function shuffleArray<T>(array: T[]): T[] {
+  return [...array].sort(() => Math.random() - 0.5);
+}
+
 export default function HomePage() {
   const [participants, setParticipants] = useState<string[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
@@ -25,11 +29,11 @@ export default function HomePage() {
 
   useEffect(() => {
     try {
-      const storedParticipants = JSON.parse(
+      const storedParticipants: string[] = JSON.parse(
         localStorage.getItem("ora_participants") || "[]"
       );
 
-      setParticipants(storedParticipants);
+      setParticipants(shuffleArray(storedParticipants));
     } catch {
       setParticipants([]);
     }
@@ -40,18 +44,19 @@ export default function HomePage() {
   }, []);
 
   const handleDraw = () => {
-    const storedParticipants: string[] = JSON.parse(
-      localStorage.getItem("ora_participants") || "[]"
-    );
+    let storedWinners: Winner[] = [];
 
-    const storedWinners: Winner[] = JSON.parse(
-      localStorage.getItem("ora_winners") || "[]"
-    );
+    try {
+      storedWinners = JSON.parse(localStorage.getItem("ora_winners") || "[]");
+    } catch {
+      storedWinners = [];
+    }
 
-    if (storedParticipants.length === 0) return;
+    if (participants.length === 0) return;
 
     setPhase("spinning");
     setWinners([]);
+    setDisplayedName("");
 
     let speed = 60;
     let elapsed = 0;
@@ -59,29 +64,30 @@ export default function HomePage() {
 
     const tick = () => {
       const randomName =
-        storedParticipants[Math.floor(Math.random() * storedParticipants.length)];
+        participants[Math.floor(Math.random() * participants.length)];
 
       setDisplayedName(randomName.replace(/^@/, ""));
 
       elapsed += speed;
-      speed = 60 + Math.floor((elapsed / totalDuration) * 200);
+      speed = 60 + Math.floor((elapsed / totalDuration) * 220);
 
       if (elapsed < totalDuration) {
         timeoutRef.current = setTimeout(tick, speed);
-      } else {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-        setDisplayedName("");
-        setWinners(storedWinners);
-        setPhase("done");
-
-        confetti({
-          particleCount: 180,
-          spread: 90,
-          origin: { y: 0.6 },
-          colors: ["#c8943e", "#e8c97a", "#f5e6c8", "#a07428"],
-        });
+        return;
       }
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      setDisplayedName("");
+      setWinners(storedWinners);
+      setPhase("done");
+
+      confetti({
+        particleCount: 180,
+        spread: 90,
+        origin: { y: 0.6 },
+        colors: ["#c8943e", "#e8c97a", "#f5e6c8", "#a07428"],
+      });
     };
 
     timeoutRef.current = setTimeout(tick, speed);
@@ -90,6 +96,7 @@ export default function HomePage() {
   const handleReset = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
+    setParticipants((current) => shuffleArray(current));
     setPhase("idle");
     setWinners([]);
     setDisplayedName("");
@@ -110,7 +117,7 @@ export default function HomePage() {
           <div className="w-16 h-0.5 bg-primary mx-auto mt-3 mb-4" />
 
           <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
-          <FaInstagram className="w-4 h-4" />
+            <FaInstagram className="w-4 h-4" />
             Tirage au sort — Concours Instagram
           </div>
         </motion.div>
@@ -180,7 +187,7 @@ export default function HomePage() {
                 animate={{ y: ["0%", "-50%"] }}
                 transition={{
                   repeat: Infinity,
-                  duration: Math.max(participants.length * 0.4, 8),
+                  duration: Math.max(participants.length * 0.35, 8),
                   ease: "linear",
                 }}
                 className="py-2"
