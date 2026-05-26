@@ -1,64 +1,264 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Shuffle } from "lucide-react";
+import { FaInstagram } from "react-icons/fa";
+import confetti from "canvas-confetti";
+import { motion, AnimatePresence } from "framer-motion";
+import WinnerCard from "@/components/WinnerCard";
+
+type Winner = {
+  name: string;
+  prize?: string;
+};
+
+type Phase = "idle" | "spinning" | "done";
+
+export default function HomePage() {
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [winners, setWinners] = useState<Winner[]>([]);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [displayedName, setDisplayedName] = useState("");
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    try {
+      const storedParticipants = JSON.parse(
+        localStorage.getItem("ora_participants") || "[]"
+      );
+
+      setParticipants(storedParticipants);
+    } catch {
+      setParticipants([]);
+    }
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleDraw = () => {
+    const storedParticipants: string[] = JSON.parse(
+      localStorage.getItem("ora_participants") || "[]"
+    );
+
+    const storedWinners: Winner[] = JSON.parse(
+      localStorage.getItem("ora_winners") || "[]"
+    );
+
+    if (storedParticipants.length === 0) return;
+
+    setPhase("spinning");
+    setWinners([]);
+
+    let speed = 60;
+    let elapsed = 0;
+    const totalDuration = 3000;
+
+    const tick = () => {
+      const randomName =
+        storedParticipants[Math.floor(Math.random() * storedParticipants.length)];
+
+      setDisplayedName(randomName.replace(/^@/, ""));
+
+      elapsed += speed;
+      speed = 60 + Math.floor((elapsed / totalDuration) * 200);
+
+      if (elapsed < totalDuration) {
+        timeoutRef.current = setTimeout(tick, speed);
+      } else {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+        setDisplayedName("");
+        setWinners(storedWinners);
+        setPhase("done");
+
+        confetti({
+          particleCount: 180,
+          spread: 90,
+          origin: { y: 0.6 },
+          colors: ["#c8943e", "#e8c97a", "#f5e6c8", "#a07428"],
+        });
+      }
+    };
+
+    timeoutRef.current = setTimeout(tick, speed);
+  };
+
+  const handleReset = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    setPhase("idle");
+    setWinners([]);
+    setDisplayedName("");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="pt-12 pb-8 text-center px-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <h1 className="text-4xl md:text-6xl font-bold text-foreground tracking-tight">
+            Ora Couture
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+          <div className="w-16 h-0.5 bg-primary mx-auto mt-3 mb-4" />
+
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+          <FaInstagram className="w-4 h-4" />
+            Tirage au sort — Concours Instagram
+          </div>
+        </motion.div>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center px-4 pb-16 gap-10">
+        <div className="w-full max-w-md">
+          <div className="relative bg-card border-2 border-primary/30 rounded-2xl h-28 flex items-center justify-center overflow-hidden shadow-lg">
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-12 bg-primary/5 border-y border-primary/20" />
+
+            <AnimatePresence mode="popLayout">
+              {phase === "idle" && (
+                <motion.p
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-xl text-muted-foreground"
+                >
+                  Prêt pour le tirage…
+                </motion.p>
+              )}
+
+              {phase === "spinning" && displayedName && (
+                <motion.p
+                  key={displayedName}
+                  initial={{ y: 30, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -30, opacity: 0 }}
+                  transition={{ duration: 0.05 }}
+                  className="text-3xl md:text-4xl font-bold text-foreground px-6 text-center"
+                >
+                  {displayedName}
+                </motion.p>
+              )}
+
+              {phase === "done" && (
+                <motion.p
+                  key="done"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-2xl font-bold text-primary"
+                >
+                  🎉 Résultats !
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {phase === "idle" && participants.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="w-full max-w-md"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <p className="text-xs text-muted-foreground text-center mb-3">
+              {participants.length} participant
+              {participants.length > 1 ? "s" : ""}
+            </p>
+
+            <div className="relative h-32 overflow-hidden rounded-xl border border-border bg-card">
+              <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-card to-transparent z-10" />
+              <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card to-transparent z-10" />
+
+              <motion.div
+                animate={{ y: ["0%", "-50%"] }}
+                transition={{
+                  repeat: Infinity,
+                  duration: Math.max(participants.length * 0.4, 8),
+                  ease: "linear",
+                }}
+                className="py-2"
+              >
+                {[...participants, ...participants].map((participant, index) => (
+                  <div
+                    key={`${participant}-${index}`}
+                    className="text-sm text-center text-muted-foreground py-1.5"
+                  >
+                    {participant.replace(/^@/, "")}
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="flex gap-3 w-full max-w-md">
+          {phase !== "done" ? (
+            <Button
+              onClick={handleDraw}
+              disabled={phase === "spinning" || participants.length === 0}
+              size="lg"
+              className="flex-1 font-semibold text-base h-14 gap-2"
+            >
+              {phase === "spinning" ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 0.6,
+                    ease: "linear",
+                  }}
+                >
+                  <Shuffle className="w-5 h-5" />
+                </motion.div>
+              ) : (
+                <Shuffle className="w-5 h-5" />
+              )}
+
+              {phase === "spinning" ? "Tirage en cours…" : "Lancer le tirage"}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleReset}
+              variant="outline"
+              size="lg"
+              className="flex-1 h-14"
+            >
+              Recommencer
+            </Button>
+          )}
         </div>
+
+        <AnimatePresence>
+          {winners.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="w-full max-w-md space-y-5"
+            >
+              <h2 className="text-2xl font-semibold text-center text-foreground">
+                {winners.length > 1 ? "Les gagnants" : "Le gagnant"} 🎉
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {winners.map((winner, index) => (
+                  <WinnerCard
+                    key={`${winner.name}-${index}`}
+                    winner={winner.name.replace(/^@/, "")}
+                    index={index}
+                    prize={winner.prize || null}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
